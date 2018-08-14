@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"syscall"
+	"sync"
 )
 
 type File struct {
@@ -16,9 +17,9 @@ type File struct {
 	filename   string
 	appendFile *os.File
 	createChan chan createArgs
-	locker     Locker
 	nodeSize   int64
 	offsetOfV  int64
+	mutex sync.Mutex
 }
 
 func newFile(filename string, tree, dim, K int) *File {
@@ -39,7 +40,6 @@ func newFile(filename string, tree, dim, K int) *File {
 		filename:   filename,
 		appendFile: appendFile,
 		createChan: make(chan createArgs, 1),
-		locker:     newLocker(),
 		nodeSize: int64(1 + // free
 			4 + // nDescendants
 			4 + // key
@@ -70,18 +70,15 @@ func (f *File) create(n Node) (int, error) {
 }
 
 func (f *File) Find(id int) (Node, error) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 	node := Node{}
 	node.id = id
 	node.storage = f
 	offset := f.offset(id)
-	err := f.locker.ReadLock(f.file.Fd(), offset, f.nodeSize)
-	if err != nil {
-		return node, err
-	}
-	defer f.locker.UnLock(f.file.Fd(), offset, f.nodeSize)
 
 	b := make([]byte, f.nodeSize)
-	_, err = syscall.Pread(int(f.file.Fd()), b, offset)
+	_, err := syscall.Pread(int(f.file.Fd()), b, offset)
 	if err != nil {
 		return node, err
 	}
@@ -119,22 +116,20 @@ func (f *File) Find(id int) (Node, error) {
 }
 
 func (f *File) Update(n Node) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 	bytes := f.nodeToBytes(n)
 	offset := f.offset(n.id)
 	file, _ := os.OpenFile(f.filename, os.O_RDWR, 0)
 	defer file.Close()
 
-	err := f.locker.WriteLock(file.Fd(), offset, f.nodeSize)
-	if err != nil {
-		return err
-	}
-	defer f.locker.UnLock(file.Fd(), offset, f.nodeSize)
-
-	_, err = syscall.Pwrite(int(file.Fd()), bytes, offset)
+	_, err := syscall.Pwrite(int(file.Fd()), bytes, offset)
 	return err
 }
 
 func (f *File) UpdateParent(id, rootIndex, parent int) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 	offset := f.offset(id) +
 		int64(1+ // free
 			4+ // nDescendants
@@ -146,13 +141,8 @@ func (f *File) UpdateParent(id, rootIndex, parent int) error {
 	file, _ := os.OpenFile(f.filename, os.O_RDWR, 0)
 	defer file.Close()
 
-	err := f.locker.WriteLock(file.Fd(), offset, 4)
-	if err != nil {
-		return err
-	}
-	defer f.locker.UnLock(file.Fd(), offset, 4)
 
-	_, err = syscall.Pwrite(int(file.Fd()), buf.Bytes(), offset)
+	_, err := syscall.Pwrite(int(file.Fd()), buf.Bytes(), offset)
 	return err
 }
 

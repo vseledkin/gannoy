@@ -12,7 +12,7 @@ func TestAngularMargin(t *testing.T) {
 	dot := angular.margin(node, y)
 	expect := 14.0
 	if dot != expect {
-		t.Errorf("Angular margin should return %d, but %d", expect, dot)
+		t.Errorf("Angular margin should return %+v, but %+v", expect, dot)
 	}
 }
 

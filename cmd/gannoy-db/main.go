@@ -197,18 +197,24 @@ loop:
 
 	e.PUT("/databases/:database/features/:key", func(c echo.Context) error {
 		database := c.Param("database")
+		//println("PUT", "to", database)
+		//println("dbs", fmt.Sprintf("%+v", databases))
 		if _, ok := databases[database]; !ok {
+			//println("PUTNOT", "to", database)
 			return c.NoContent(http.StatusUnprocessableEntity)
 		}
+		//println("PUT1")
 		key, err := strconv.Atoi(c.Param("key"))
 		if err != nil {
 			return c.NoContent(http.StatusUnprocessableEntity)
 		}
+		//println("PUT2")
 		feature := new(Feature)
 		if err := c.Bind(feature); err != nil {
 			return err
 		}
-
+		//println("PUT2")
+		//println(feature.W)
 		gannoy := databases[database]
 		err = gannoy.UpdateItem(key, feature.W)
 		if err != nil {

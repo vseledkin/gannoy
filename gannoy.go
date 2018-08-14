@@ -82,15 +82,15 @@ func (g *GannoyIndex) UpdateItem(key int, w []float64) error {
 	return <-args.result
 }
 
-func (g *GannoyIndex) GetNnsByKey(key, n, searchK int) ([]int, error) {
+func (g *GannoyIndex) GetNnsByKey(key, n, searchK int) ([]int, []float32, error) {
 	m, err := g.nodes.getNodeByKey(key)
 	if err != nil || !m.isLeaf() {
-		return []int{}, fmt.Errorf("Not found")
+		return []int{}, []float32{}, fmt.Errorf("Not found")
 	}
 	return g.GetAllNns(m.v, n, searchK)
 }
 
-func (g *GannoyIndex) GetAllNns(v []float64, n, searchK int) ([]int, error) {
+func (g *GannoyIndex) GetAllNns(v []float64, n, searchK int) ([]int, []float32, error) {
 	if searchK == -1 {
 		searchK = n * g.tree
 	}
@@ -108,7 +108,7 @@ func (g *GannoyIndex) GetAllNns(v []float64, n, searchK int) ([]int, error) {
 
 		nd, err := g.nodes.getNode(i)
 		if err != nil {
-			return []int{}, err
+			return []int{}, []float32{}, err
 		}
 		q.Pop()
 		if nd.isLeaf() {
@@ -135,7 +135,7 @@ func (g *GannoyIndex) GetAllNns(v []float64, n, searchK int) ([]int, error) {
 		last = j
 		node, err := g.nodes.getNode(j)
 		if err != nil {
-			return []int{}, err
+			return []int{}, []float32{}, err
 		}
 		nnsDist[idx-dup] = sorter{value: g.distance.distance(v, node.v), id: node.key}
 	}
@@ -150,11 +150,13 @@ func (g *GannoyIndex) GetAllNns(v []float64, n, searchK int) ([]int, error) {
 	HeapSort(nnsDist, DESC, p)
 
 	result := make([]int, p)
+	distances := make([]float32, p)
 	for i := 0; i < p; i++ {
 		result[i] = nnsDist[m-1-i].id
+		distances[i] = float32(nnsDist[m-1-i].value)
 	}
 
-	return result, nil
+	return result, distances, nil
 }
 
 func (g *GannoyIndex) addItem(key int, w []float64) error {
@@ -335,7 +337,7 @@ func (g *GannoyIndex) remove(root int, node Node) {
 		if target == -1 {
 			return
 		}
-		children := append(parent.children[:target], parent.children[(target+1):]...)
+		children := append(parent.children[:target], parent.children[(target + 1):]...)
 		parent.nDescendants--
 		parent.children = children
 		parent.save()

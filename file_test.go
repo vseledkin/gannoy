@@ -78,7 +78,7 @@ func TestFileCreateAndFind(t *testing.T) {
 			}
 		}
 		if found.free != node.free {
-			t.Errorf("File find should return created node with free %d, but %d", found.free, node.free)
+			t.Errorf("File find should return created node with free %+v, but %+v", found.free, node.free)
 		}
 	}
 }
